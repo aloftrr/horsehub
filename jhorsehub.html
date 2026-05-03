@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>🐴 StreamHub – Secure Video Streaming (No Download)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none; /* prevent text selection */
+        }
+        body {
+            background: linear-gradient(145deg, #0f172a 0%, #1e1b4b 100%);
+            min-height: 100vh;
+            color: #f0f0f0;
+            font-family: system-ui, 'Segoe UI', monospace;
+        }
+        .app-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+        /* sidebar */
+        .sidebar {
+            width: 280px;
+            background: rgba(30, 27, 75, 0.9);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid #facc15;
+            padding: 1.5rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        .sidebar .logo-area h2 {
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, #facc15, #ec489a);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .admin-panel {
+            background: rgba(0,0,0,0.4);
+            border-radius: 1.2rem;
+            padding: 1rem;
+            border: 1px solid #facc15;
+        }
+        button, .file-label {
+            background: #334155;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 2rem;
+            color: white;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        button.primary {
+            background: #ec489a;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 0.5rem;
+            margin: 0.4rem 0;
+            background: #1e1b4b;
+            border: 1px solid #facc15;
+            border-radius: 0.8rem;
+            color: white;
+        }
+        .main-content {
+            flex: 1;
+            padding: 1.5rem 2rem;
+        }
+        .search-wrapper {
+            display: flex;
+            align-items: center;
+            background: #1e1b4b;
+            border: 1px solid #facc15;
+            border-radius: 3rem;
+            padding: 0.3rem 0.8rem;
+            margin-bottom: 2rem;
+        }
+        .search-wrapper i {
+            color: #facc15;
+            margin-right: 0.5rem;
+        }
+        #searchInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: white;
+            font-size: 1rem;
+            padding: 0.6rem 0;
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 1.5rem;
+        }
+        .video-card {
+            background: #1e1b4bcc;
+            backdrop-filter: blur(8px);
+            border-radius: 1.2rem;
+            overflow: hidden;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 1px solid #facc15;
+        }
+        .video-card:hover {
+            transform: translateY(-5px);
+            border-color: #ec489a;
+        }
+        .thumb {
+            aspect-ratio: 16/9;
+            background: #00000066;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+        }
+        .info {
+            padding: 0.7rem;
+        }
+        .info h3 {
+            font-size: 0.95rem;
+        }
+        .views {
+            font-size: 0.7rem;
+            color: #facc15;
+        }
+        .no-results {
+            grid-column: 1/-1;
+            text-align: center;
+            padding: 2rem;
+        }
+        /* video player modal - no download controls */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(12px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: #0f0f1a;
+            border-radius: 1.5rem;
+            max-width: 90%;
+            width: 900px;
+            padding: 1rem;
+            border: 1px solid #facc15;
+            position: relative;
+        }
+        /* custom video player container - hide download button via CSS */
+        video {
+            width: 100%;
+            border-radius: 1rem;
+            outline: none;
+        }
+        /* hide the download button that appears in Chrome/Edge */
+        video::-internal-media-controls-download-button {
+            display: none;
+        }
+        video::-webkit-media-controls-enclosure {
+            overflow: hidden;
+        }
+        video::-webkit-media-controls-panel {
+            width: calc(100% + 30px);
+        }
+        /* Remove default download button completely */
+        video::-webkit-media-controls-download-button {
+            display: none !important;
+        }
+        /* For Firefox */
+        video::-moz-media-controls-download-button {
+            display: none;
+        }
+        .close {
+            float: right;
+            font-size: 1.8rem;
+            cursor: pointer;
+            margin: 0 0 0.5rem 0;
+        }
+        footer {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.7rem;
+            color: #aaa;
+        }
+        @media (max-width: 700px) {
+            .app-layout { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; }
+            .main-content { padding: 1rem; }
+        }
+        /* disable right-click globally */
+        body {
+            -webkit-touch-callout: none;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body oncontextmenu="return false;"> <!-- disable right-click -->
+<div class="app-layout">
+    <div class="sidebar">
+        <div class="logo-area">
+            <h2>🔒 StreamHub</h2>
+            <p>No Download • Secure Streaming</p>
+        </div>
+        <div class="admin-panel" id="adminPanel">
+            <div class="admin-header" style="display:flex; justify-content:space-between;">
+                <strong>🔐 Admin</strong>
+                <div id="authWidget"></div>
+            </div>
+            <div id="uploadForm" style="display: none;">
+                <input type="text" id="videoTitle" placeholder="Title">
+                <textarea id="videoDesc" placeholder="Description" rows="2"></textarea>
+                <input type="text" id="videoTags" placeholder="Tags">
+                <input type="file" id="videoFile" accept="video/mp4">
+                <button id="uploadBtn" class="primary">📤 Upload (secure)</button>
+            </div>
+        </div>
+        <footer>⚡ Videos streamed – no direct file access</footer>
+    </div>
+    <div class="main-content">
+        <h1>🎬 Protected Videos</h1>
+        <div class="search-wrapper">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="Search by title, description or tags...">
+        </div>
+        <div id="videoGallery" class="video-grid">Loading...</div>
+    </div>
+</div>
+
+<!-- Video player modal (no download controls) -->
+<div id="playerModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <video id="secureVideoPlayer" controls controlsList="nodownload noplaybackrate" disablePictureInPicture></video>
+        <h3 id="modalTitle" style="margin-top: 0.8rem;"></h3>
+        <p id="modalDesc"></p>
+        <span id="modalViews"></span>
+        <p style="font-size:0.7rem; color:#facc15; margin-top:0.5rem;">🔒 Download disabled • Right-click blocked</p>
+    </div>
+</div>
+
+<script>
+    // ---------- IndexedDB for secure storage (blobs) ----------
+    const DB_NAME = 'SecureStreamDB';
+    const STORE_NAME = 'videos';
+    let db = null;
+    const ADMIN_PASSWORD = 'Rishiraushan@199';
+    let isAdmin = false;
+    let allVideos = [];
+    let currentFilter = '';
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 3);
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                db = request.result;
+                resolve(db);
+            };
+            request.onupgradeneeded = (e) => {
+                if (!e.target.result.objectStoreNames.contains(STORE_NAME)) {
+                    e.target.result.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                }
+            };
+        });
+    }
+
+    async function saveVideo(metadata, videoBlob) {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            const record = { ...metadata, videoBlob, views: 0, uploaded: Date.now() };
+            const request = store.add(record);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function getAllVideos() {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function incrementViews(videoId) {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const video = await new Promise(res => { store.get(videoId).onsuccess = e => res(e.target.result); });
+        if (video) { video.views++; store.put(video); }
+    }
+
+    async function deleteVideo(videoId) {
+        if (!isAdmin) return;
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).delete(videoId);
+        await tx.complete;
+        await refreshCache();
+        renderFiltered();
+    }
+
+    async function refreshCache() {
+        allVideos = await getAllVideos();
+    }
+
+    function matchesFilter(video, query) {
+        if (!query) return true;
+        const q = query.toLowerCase();
+        return (video.title?.toLowerCase().includes(q) ||
+                video.description?.toLowerCase().includes(q) ||
+                video.tags?.toLowerCase().includes(q));
+    }
+
+    function renderFiltered() {
+        const gallery = document.getElementById('videoGallery');
+        const filtered = allVideos.filter(v => matchesFilter(v, currentFilter));
+        if (filtered.length === 0) {
+            gallery.innerHTML = `<div class="no-results"><i class="fas fa-shield-alt"></i><h3>No videos found</h3><p>Try different keywords</p></div>`;
+            return;
+        }
+        gallery.innerHTML = filtered.map(v => `
+            <div class="video-card" data-id="${v.id}">
+                <div class="thumb">🎬 MP4</div>
+                <div class="info">
+                    <h3>${escapeHtml(v.title)}</h3>
+                    <p>${escapeHtml(v.description?.substring(0,60)||'')}</p>
+                    <span class="views">👁️ ${v.views || 0} views</span>
+                    ${isAdmin ? `<button class="del-btn" data-id="${v.id}" style="background:#be123c; margin-top:6px; padding:2px 8px;">Delete</button>` : ''}
+                </div>
+            </div>
+        `).join('');
+        // attach events
+        document.querySelectorAll('.video-card').forEach(card => {
+            const id = Number(card.dataset.id);
+            card.addEventListener('click', (e) => {
+                if (e.target.classList.contains('del-btn')) return;
+                playVideoSecure(id);
+            });
+            const del = card.querySelector('.del-btn');
+            if (del) del.addEventListener('click', (e) => { e.stopPropagation(); if(confirm('Delete?')) deleteVideo(id); });
+        });
+    }
+
+    // ---------- SECURE STREAMING (Blob URL, no direct src attribute from file path) ----------
+    async function playVideoSecure(videoId) {
+        const video = allVideos.find(v => v.id === videoId);
+        if (!video) return;
+        await incrementViews(videoId);
+        await refreshCache();
+        renderFiltered();
+
+        const modal = document.getElementById('playerModal');
+        const videoElem = document.getElementById('secureVideoPlayer');
+        const titleElem = document.getElementById('modalTitle');
+        const descElem = document.getElementById('modalDesc');
+        const viewsElem = document.getElementById('modalViews');
+
+        // Create blob URL from stored blob – no direct file link, no download possible via right-click save as
+        const blobUrl = URL.createObjectURL(video.videoBlob);
+        videoElem.src = blobUrl;
+        titleElem.innerText = video.title;
+        descElem.innerText = video.description || '';
+        viewsElem.innerText = `👁️ ${video.views} views`;
+        modal.style.display = 'flex';
+
+        // Cleanup on close
+        const closeModal = () => {
+            modal.style.display = 'none';
+            videoElem.pause();
+            URL.revokeObjectURL(blobUrl);
+            videoElem.src = '';
+        };
+        document.querySelector('#playerModal .close').onclick = closeModal;
+        modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+        // Additional security: disable keyboard shortcuts for save (Ctrl+S, etc.) but we already block right-click
+        document.addEventListener('keydown', blockSaveKeys);
+        modal.addEventListener('keydown', blockSaveKeys);
+        function blockSaveKeys(e) {
+            if ((e.ctrlKey && (e.key === 's' || e.key === 'S')) || (e.ctrlKey && e.shiftKey && e.key === 'I')) {
+                e.preventDefault();
+                return false;
+            }
+        }
+        // remove listener when modal closed (simplified, but fine)
+        const originalClose = closeModal;
+        window.closeModalWithCleanup = () => {
+            document.removeEventListener('keydown', blockSaveKeys);
+            originalClose();
+        };
+        document.querySelector('#playerModal .close').onclick = () => window.closeModalWithCleanup();
+        modal.onclick = (e) => { if (e.target === modal) window.closeModalWithCleanup(); };
+    }
+
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+
+    // Admin UI
+    function renderAuthUI() {
+        const authDiv = document.getElementById('authWidget');
+        const uploadForm = document.getElementById('uploadForm');
+        if (isAdmin) {
+            authDiv.innerHTML = `<span style="background:#ec489a; padding:2px 8px; border-radius:2rem;">Admin</span> <button id="logoutBtn">Logout</button>`;
+            uploadForm.style.display = 'block';
+            document.getElementById('logoutBtn')?.addEventListener('click', () => { isAdmin = false; renderAuthUI(); renderFiltered(); });
+        } else {
+            authDiv.innerHTML = `<div style="display:flex; gap:4px;"><input type="password" id="adminPass" placeholder="Password" style="width:100px;"><button id="loginBtn">Login</button></div>`;
+            uploadForm.style.display = 'none';
+            document.getElementById('loginBtn')?.addEventListener('click', () => {
+                if (document.getElementById('adminPass').value === ADMIN_PASSWORD) {
+                    isAdmin = true;
+                    renderAuthUI();
+                    renderFiltered();
+                } else alert('Wrong password');
+            });
+        }
+    }
+
+    async function uploadVideo() {
+        if (!isAdmin) return alert('Admin only');
+        const title = document.getElementById('videoTitle').value.trim();
+        const desc = document.getElementById('videoDesc').value.trim();
+        const tags = document.getElementById('videoTags').value.trim();
+        const file = document.getElementById('videoFile').files[0];
+        if (!title) return alert('Enter title');
+        if (!file || file.type !== 'video/mp4') return alert('Select MP4 file');
+        if (file.size > 500*1024*1024) return alert('Max 500MB');
+        await saveVideo({ title, description: desc, tags }, file);
+        alert('Uploaded securely!');
+        document.getElementById('videoTitle').value = '';
+        document.getElementById('videoDesc').value = '';
+        document.getElementById('videoTags').value = '';
+        document.getElementById('videoFile').value = '';
+        await refreshCache();
+        renderFiltered();
+    }
+
+    // search
+    function setupSearch() {
+        const inp = document.getElementById('searchInput');
+        inp.addEventListener('input', (e) => { currentFilter = e.target.value; renderFiltered(); });
+    }
+
+    window.onload = async () => {
+        await openDB();
+        await refreshCache();
+        renderAuthUI();
+        renderFiltered();
+        setupSearch();
+        document.getElementById('uploadBtn')?.addEventListener('click', uploadVideo);
+        // additional global right-click prevention (already in body)
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+        // prevent drag and drop of video element
+        document.addEventListener('dragstart', (e) => e.preventDefault());
+    };
+</script>
+</body>
+</html>
